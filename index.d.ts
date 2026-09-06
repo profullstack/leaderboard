@@ -1,5 +1,8 @@
 export type Period = 'all' | 'day' | 'week' | 'month';
 export type Format = 'number' | 'integer' | 'usd' | 'percent';
+/** Which side of the transaction a board ranks. Boards are never mixed across sides. */
+export type Side = 'sell' | 'buy' | 'use';
+export const SIDES: Side[];
 
 export interface Event { player: string; name?: string; metric: string; delta: number; at: number }
 
@@ -41,8 +44,16 @@ export interface Badge { id: string; emoji?: string; label?: string; describe?: 
 export interface EarnedBadge { id: string; emoji: string; label: string; describe: string; at: number }
 export function defaultBadges(names?: { sales?: string; properties?: string; niches?: string }): Badge[];
 
-export interface BoardOptions { label?: string; metric?: string; format?: Format; unit?: string; min?: number; order?: 'asc' | 'desc'; tiebreak?: string }
-export interface Board { id: string; label: string; metric: string; format: Format; unit: string }
+export interface BoardOptions {
+  label?: string; metric?: string; format?: Format; unit?: string; min?: number;
+  order?: 'asc' | 'desc'; tiebreak?: string;
+  /** Money to this actor is `sell`, money from them is `buy`, volume with no money is `use`. Default `sell`. */
+  side?: Side;
+  /** What one row is, e.g. "Publisher" or "Crawler". Names the column and appears beside the title. */
+  actor?: string;
+}
+export interface Board { id: string; label: string; metric: string; format: Format; unit: string; side: Side; actor: string | null }
+export interface SideGroup { side: Side; label: string; boards: Board[] }
 
 export interface Profile {
   id: string; name: string;
@@ -60,10 +71,11 @@ export interface Profile {
 export interface Row {
   rank: number | null; id: string; name: string; value: number; display: string;
   streak: number; bestStreak: number; badges: Array<{ id: string; emoji: string; label: string }>;
+  /** Set only on `sell` boards: a commission rate is a property of earning. */
   commission?: number; url: string;
 }
 export interface Standing extends Row { qualified: boolean; min: number }
-export interface Top { board: Board; period: Period; periods: Period[]; generatedAt: string; total: number; rows: Row[]; me?: Standing | null }
+export interface Top { board: Board; sides: SideGroup[]; period: Period; periods: Period[]; generatedAt: string; total: number; rows: Row[]; me?: Standing | null }
 
 export interface LeaderboardOptions {
   store?: Store;
@@ -73,6 +85,8 @@ export interface LeaderboardOptions {
   boards?: Record<string, BoardOptions> | Array<BoardOptions & { id: string }>;
   periods?: Period[];
   defaultPeriod?: Period;
+  /** Display names per side. Defaults: sell "Earning", buy "Spending", use "Usage". */
+  sides?: Partial<Record<Side, string>>;
   ladder?: Ladder | boolean;
   badges?: Badge[];
   cacheMs?: number;

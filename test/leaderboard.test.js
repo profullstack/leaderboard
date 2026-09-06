@@ -141,3 +141,61 @@ test('validation', async () => {
   await assert.rejects(() => lb.top({ board: 'nope' }), /unknown board/);
   assert.throws(() => createLeaderboard({ boards: { 'bad id': {} } }), /board id/);
 });
+
+
+test('boards declare a side and are never mixed across sides', async () => {
+  const lb = createLeaderboard({
+    store: memoryStore(), cacheMs: 0, siteName: 'NicheDB', siteUrl: 'https://nichedb.dev',
+    boards: {
+      earners: { label: 'Top earners', metric: 'cents', format: 'usd', side: 'sell', actor: 'Publisher' },
+      spenders: { label: 'Biggest spenders', metric: 'spent', format: 'usd', side: 'buy', actor: 'Crawler' },
+      crawled: { label: 'Most pages crawled', metric: 'pages', side: 'use' },
+    },
+  });
+  const idx = lb.index();
+  assert.deepEqual(idx.sides.map((s) => [s.side, s.label, s.boards.map((b) => b.id)]), [
+    ['sell', 'Earning', ['earners']],
+    ['buy', 'Spending', ['spenders']],
+    ['use', 'Usage', ['crawled']],
+  ]);
+  // The same actor can hold a rank on both sides without the numbers being pooled.
+  await lb.record({ player: 'gptbot', name: 'GPTBot', metrics: { spent: 4200, pages: 90000 } });
+  await lb.record({ player: 'pub-1', name: 'Dr. Okafor', metrics: { cents: 4200 } });
+  const buy = await lb.top({ board: 'spenders' });
+  const sell = await lb.top({ board: 'earners' });
+  assert.deepEqual(buy.rows.map((r) => r.id), ['gptbot'], 'the buy board holds only buyers');
+  assert.deepEqual(sell.rows.map((r) => r.id), ['pub-1'], 'the sell board holds only sellers');
+  assert.equal(buy.board.side, 'buy');
+  assert.equal(buy.board.actor, 'Crawler');
+  assert.equal(buy.rows[0].display, sell.rows[0].display, 'equal money, and still two separate boards');
+  // Every response carries the grouping so a widget can segregate without a second fetch.
+  assert.deepEqual(buy.sides.map((s) => s.side), ['sell', 'buy', 'use']);
+});
+
+test('a bad side is refused, and sell is the default', () => {
+  assert.throws(() => createLeaderboard({ boards: { x: { side: 'sideways' } } }), /board side must be one of/);
+  const lb = createLeaderboard({ store: memoryStore(), boards: { x: { metric: 'n' } } });
+  assert.equal(lb.boards[0].side, 'sell');
+});
+
+test('custom side labels', () => {
+  const lb = createLeaderboard({ store: memoryStore(), sides: { buy: 'Bots paying us' }, boards: { s: { metric: 'spent', side: 'buy' } } });
+  assert.equal(lb.index().sides[0].label, 'Bots paying us');
+});
+
+
+test('a commission rate never appears on a buy or usage board', async () => {
+  const lb = createLeaderboard({
+    store: memoryStore(), cacheMs: 0, ladder: true,
+    boards: {
+      earners: { metric: 'cents', side: 'sell' },
+      spenders: { metric: 'spent', side: 'buy' },
+      crawled: { metric: 'pages', side: 'use' },
+    },
+  });
+  await lb.record({ player: 'gptbot', metrics: { spent: 4200, pages: 900, cents: 10 } });
+  await lb.set({ player: 'gptbot', metrics: { properties: 6, niches: 6 } });
+  assert.equal((await lb.top({ board: 'earners' })).rows[0].commission, 80);
+  assert.equal((await lb.top({ board: 'spenders' })).rows[0].commission, undefined);
+  assert.equal((await lb.top({ board: 'crawled' })).rows[0].commission, undefined);
+});

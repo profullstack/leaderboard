@@ -4,6 +4,8 @@ A public leaderboard that drops into any site. Score events in, ranked boards ou
 
 Zero dependencies. The core is a Fetch API handler, so it runs in Node, Bun, Deno and at the edge. Adapters for Hono and Next.js. Stores: in-memory, or any SQL client with `execute({ sql, args })` (libsql/Turso, sqlite, Postgres).
 
+It ranks either side of a transaction. Sellers earning, buyers spending, and plain usage are separate boards that never blend, because a publisher earning $900 and a crawler spending $900 are not the same fact.
+
 Built for marketplaces where people sell through properties and niches and earn a growing cut, but every board, badge and metric is yours to define.
 
 ## Install
@@ -84,6 +86,30 @@ Sticky mode is the retention feature. Add `data-sticky="bottom-right"` (or `bott
 
 The widget fires `leaderboard:render` on its container with the JSON as `detail`, for anything you want to do with the numbers.
 
+## Sides of the transaction
+
+Every board declares a `side`:
+
+| `side` | Money | Default label | Example |
+| --- | --- | --- | --- |
+| `sell` | to the actor | Earning | Publishers by revenue, affiliates by commission |
+| `buy` | from the actor | Spending | Crawlers by what they paid for passes |
+| `use` | none | Usage | Pages crawled, API calls, bytes served |
+
+```js
+boards: {
+  earners:  { label: 'Top earners',        metric: 'cents', format: 'usd', side: 'sell', actor: 'Publisher' },
+  spenders: { label: 'Biggest spenders',   metric: 'spent', format: 'usd', side: 'buy',  actor: 'Crawler' },
+  crawled:  { label: 'Most pages crawled', metric: 'pages', format: 'integer', side: 'use', actor: 'Crawler' },
+}
+```
+
+The widget puts a tab per side across the top and the boards of that side beneath, so only one side is ever on screen. `actor` names the column, so the same table reads "Publisher" on one side and "Crawler" on the other. The commission rate is shown only on `sell` boards, since a rate against a buyer would state something false.
+
+The same identity can hold a rank on both sides at once. Their totals are never pooled.
+
+Rename the tabs with `sides: { buy: 'Bots paying us' }`.
+
 ## Metrics
 
 Three kinds, one vocabulary:
@@ -92,7 +118,7 @@ Three kinds, one vocabulary:
 - **Gauges** go in through `set()` and are the current value (properties owned, niches promoted, followers). Boards on a gauge show the same number in every period.
 - **Derived**: `streak` (consecutive UTC days with any `record()`, still current through yesterday) and `bestStreak`.
 
-A board is `{ label, metric, format, unit, min, order, tiebreak }`. `format` is `number`, `integer`, `usd` (cents in) or `percent`. Players below `min` do not appear. Ties break on `tiebreak`, then on who got there first.
+A board is `{ label, metric, format, unit, min, order, tiebreak, side, actor }`. `format` is `number`, `integer`, `usd` (cents in) or `percent`. Players below `min` do not appear. Ties break on `tiebreak`, then on who got there first.
 
 `record()` and `set()` return the badges newly earned, for a toast.
 

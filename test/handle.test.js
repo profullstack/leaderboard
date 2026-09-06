@@ -69,7 +69,7 @@ test('share page and profile JSON', async () => {
 test('embed page, full page, and the widget script', async () => {
   const lb = await seeded();
   const embed = await (await get(lb, '/leaderboard/embed?board=sales&period=month&sticky=bottom-right&me=doc-1')).text();
-  assert.match(embed, /<script src="\/leaderboard\/embed\.js" data-board="sales" data-period="month" data-limit="25" data-sticky="bottom-right" data-me="doc-1" data-base="\/leaderboard">/);
+  assert.match(embed, /<script src="\/leaderboard\/embed\.js" data-board="sales" data-period="month" data-limit="25" data-sticky="bottom-right" data-me="doc-1" data-side="sell" data-base="\/leaderboard">/);
   const full = await (await get(lb, '/leaderboard')).text();
   assert.match(full, /max-width:760px/);
   const js = await get(lb, '/leaderboard/embed.js');

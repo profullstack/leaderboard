@@ -39,6 +39,7 @@ export function createLeaderboard(options = {}) {
   const siteUrl = options.siteUrl ? trimSlash(options.siteUrl) : '';
   const periods = (options.periods ?? ['all', 'week', 'month']).filter((p) => p in PERIODS);
   const defaultPeriod = periods.includes(options.defaultPeriod) ? options.defaultPeriod : periods[0];
+  const sides = { ...DEFAULT_SIDES, ...(options.sides ?? {}) };
   const boards = normaliseBoards(options.boards);
   const defaultBoard = boards[0].id;
   const ladder = options.ladder === undefined ? null : options.ladder === true ? commissionLadder() : options.ladder;
@@ -194,7 +195,7 @@ export function createLeaderboard(options = {}) {
     }
     rows.sort((a, c) => a.rank - c.rank);
     const n = Math.min(limitMax, Math.max(1, Number(limit) || 25));
-    return { board: pub(b), period, periods, generatedAt: new Date(now()).toISOString(), total: rows.length, rows: rows.slice(Number(offset) || 0, (Number(offset) || 0) + n) };
+    return { board: pub(b), sides: boardsIndex().sides, period, periods, generatedAt: new Date(now()).toISOString(), total: rows.length, rows: rows.slice(Number(offset) || 0, (Number(offset) || 0) + n) };
   }
 
   async function standing({ player, board = defaultBoard, period = defaultPeriod } = {}) {
@@ -222,13 +223,17 @@ export function createLeaderboard(options = {}) {
       rank: r, id: p.id, name: p.name, value, display: format(value, b.format),
       streak: p.streak, bestStreak: p.bestStreak,
       badges: p.badges.map(({ id, emoji, label }) => ({ id, emoji, label })),
-      commission: p.commission ? p.commission.rate : undefined,
+      // A commission rate is a property of earning. Showing one against a buyer
+      // or a usage count states something false about the number next to it.
+      commission: b.side === 'sell' && p.commission ? p.commission.rate : undefined,
       url: profileUrl(p.id),
     };
   }
 
   function boardsIndex() {
-    return { site: siteName, siteUrl, basePath, periods, defaultPeriod, boards: boards.map(pub), ladder: ladder ? { base: ladder.base, cap: ladder.cap, describe: ladder.describe() } : null, badges: badges.map(({ id, emoji, label, describe }) => ({ id, emoji, label, describe })) };
+    const grouped = SIDES.filter((side) => boards.some((b) => b.side === side))
+      .map((side) => ({ side, label: sides[side], boards: boards.filter((b) => b.side === side).map(pub) }));
+    return { site: siteName, siteUrl, basePath, periods, defaultPeriod, sides: grouped, boards: boards.map(pub), ladder: ladder ? { base: ladder.base, cap: ladder.cap, describe: ladder.describe() } : null, badges: badges.map(({ id, emoji, label, describe }) => ({ id, emoji, label, describe })) };
   }
 
   /** Fetch-API handler: answers under basePath, null for anything else. */
@@ -272,7 +277,7 @@ export function createLeaderboard(options = {}) {
   }
 
   function rss(result) {
-    const title = `${siteName}: ${result.board.label} (${periodLabel(result.period)})`;
+    const title = `${siteName}: ${result.board.label}, ${sides[result.board.side]} (${periodLabel(result.period)})`;
     const link = `${siteUrl}${basePath}?board=${result.board.id}&period=${result.period}`;
     const items = result.rows.map((r) => {
       const badgeText = r.badges.map((b) => `${b.emoji} ${b.label}`).join(', ');
@@ -299,7 +304,7 @@ ${items.join('\n')}
   function embedPage({ board, period, limit, sticky, theme, me, full }) {
     const attrs = [
       `data-board="${esc(board.id)}"`, `data-period="${esc(period)}"`, `data-limit="${esc(String(limit))}"`,
-      sticky ? `data-sticky="${esc(sticky)}"` : '', theme ? `data-theme="${esc(theme)}"` : '', me ? `data-me="${esc(me)}"` : '',
+      sticky ? `data-sticky="${esc(sticky)}"` : '', theme ? `data-theme="${esc(theme)}"` : '', me ? `data-me="${esc(me)}"` : '', `data-side="${esc(board.side)}"`,
       `data-base="${esc(basePath)}"`,
     ].filter(Boolean).join(' ');
     const title = `${board.label}: ${siteName}`;
@@ -315,10 +320,13 @@ ${items.join('\n')}
   }
 
   function sharePage(p) {
-    const lines = boards.map((b) => {
-      const r = p.ranks[b.id]?.[defaultPeriod];
-      const v = p.values[b.id]?.[defaultPeriod];
-      return r ? `<li><strong>#${r}</strong> on ${esc(b.label)} <span class="muted">(${esc(periodLabel(defaultPeriod))}, ${esc(format(v, b.format))})</span></li>` : '';
+    const lines = SIDES.filter((side) => boards.some((b) => b.side === side)).map((side) => {
+      const items = boards.filter((b) => b.side === side).map((b) => {
+        const r = p.ranks[b.id]?.[defaultPeriod];
+        const v = p.values[b.id]?.[defaultPeriod];
+        return r ? `<li><strong>#${r}</strong> on ${esc(b.label)} <span class="muted">(${esc(periodLabel(defaultPeriod))}, ${esc(format(v, b.format))})</span></li>` : '';
+      }).filter(Boolean).join('');
+      return items ? `<h3 class="side">${esc(sides[side])}</h3><ul>${items}</ul>` : '';
     }).filter(Boolean).join('');
     const bestRank = Math.min(...boards.map((b) => p.ranks[b.id]?.[defaultPeriod] ?? Infinity));
     const headline = Number.isFinite(bestRank) ? `#${bestRank} on ${siteName}` : `${p.name} on ${siteName}`;
@@ -337,11 +345,12 @@ ${items.join('\n')}
 main{max-width:640px;margin:0 auto;padding:40px 20px}h1{font-size:28px;margin:0 0 4px}h2{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#8b93a7;margin:24px 0 8px}
 .big{font-size:40px;font-weight:800;margin:0}.muted{color:#8b93a7}ul{list-style:none;padding:0;margin:0}li{padding:8px 0;border-bottom:1px solid #1f2430}.e{font-size:20px;margin-right:6px}
 a{color:#7cc4ff}.stats{display:flex;gap:24px;flex-wrap:wrap}.stats div b{display:block;font-size:22px}
+h3.side{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#8b93a7;margin:16px 0 4px;font-weight:600}
 </style></head><body><main>
 <p class="muted"><a href="${esc(boardUrl)}">${esc(siteName)} leaderboard</a></p>
 <h1>${esc(p.name)}</h1><p class="muted">${esc(headline)}</p>
 <div class="stats"><div><b>${p.streak}</b><span class="muted">day streak</span></div><div><b>${p.bestStreak}</b><span class="muted">best streak</span></div><div><b>${p.badges.length}</b><span class="muted">badges</span></div></div>
-<section><h2>Boards</h2><ul>${lines || '<li class="muted">Not on a board yet.</li>'}</ul></section>
+<section><h2>Boards</h2>${lines || '<p class="muted">Not on a board yet.</p>'}</section>
 <section><h2>Badges</h2><ul>${badgeHtml}</ul></section>
 ${ladderHtml}
 <p class="muted" style="margin-top:32px"><a href="${esc(p.shareUrl)}">Share this page</a></p>
@@ -367,17 +376,29 @@ ${ladderHtml}
   };
 }
 
+/**
+ * Which side of the transaction a board ranks. Money flowing to someone is
+ * `sell`, money flowing from them is `buy`, and volume with no money attached
+ * is `use`. Boards are never mixed across sides: a seller earning $900 and a
+ * crawler spending $900 are not comparable, and showing them in one list is a
+ * lie about what the number means.
+ */
+export const SIDES = ['sell', 'buy', 'use'];
+const DEFAULT_SIDES = { sell: 'Earning', buy: 'Spending', use: 'Usage' };
+
 function normaliseBoards(input) {
   const src = input && Object.keys(input).length ? input : { top: { label: 'Top', metric: 'score' } };
   const list = Array.isArray(src) ? src : Object.entries(src).map(([id, b]) => ({ id, ...b }));
   return list.map((b) => {
     if (!b.id || !/^[a-z0-9_-]+$/i.test(b.id)) throw new TypeError(`board id must be [a-z0-9_-]: ${b.id}`);
-    return { id: b.id, label: b.label ?? b.id, metric: b.metric ?? 'score', format: b.format ?? 'number', min: Number.isFinite(b.min) ? b.min : Number.MIN_VALUE, order: b.order === 'asc' ? 'asc' : 'desc', tiebreak: b.tiebreak ?? null, unit: b.unit ?? '' };
+    const side = b.side ?? 'sell';
+    if (!SIDES.includes(side)) throw new TypeError(`board side must be one of ${SIDES.join(', ')}: ${side}`);
+    return { id: b.id, label: b.label ?? b.id, metric: b.metric ?? 'score', format: b.format ?? 'number', min: Number.isFinite(b.min) ? b.min : Number.MIN_VALUE, order: b.order === 'asc' ? 'asc' : 'desc', tiebreak: b.tiebreak ?? null, unit: b.unit ?? '', side, actor: b.actor ?? null };
   });
 }
 
 function pub(b) {
-  return { id: b.id, label: b.label, metric: b.metric, format: b.format, unit: b.unit };
+  return { id: b.id, label: b.label, metric: b.metric, format: b.format, unit: b.unit, side: b.side, actor: b.actor };
 }
 
 function blank(id) {

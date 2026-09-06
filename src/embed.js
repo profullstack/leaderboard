@@ -30,6 +30,7 @@ const WIDGET = String.raw`(function () {
   var period = d.period || '';
   var limit = d.limit || '10';
   var me = d.me || '';
+  var side = d.side || '';
   var sticky = d.sticky || '';
   var theme = d.theme || 'auto';
   var refresh = d.refresh === undefined ? 60 : Number(d.refresh) || 0;
@@ -41,6 +42,13 @@ const WIDGET = String.raw`(function () {
     '.pflb *{box-sizing:border-box}.pflb a{color:inherit;text-decoration:none}' +
     '.pflb-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}' +
     '.pflb-title{font-weight:700;font-size:15px;margin:0}.pflb-tabs{display:flex;gap:4px;flex-wrap:wrap}' +
+    '.pflb-sides{display:flex;gap:2px;padding:8px 14px 0;flex-wrap:wrap}' +
+    '.pflb-sides button{font:inherit;font-size:12px;font-weight:600;padding:6px 12px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);cursor:pointer}' +
+    '.pflb-sides button.on{color:var(--fg);border-bottom-color:var(--accent)}' +
+    '.pflb-actor{font-size:11px;color:var(--muted);font-weight:400;margin-left:6px}' +
+    '.pflb-boards{display:flex;gap:4px;flex-wrap:wrap;padding:0 14px 10px}' +
+    '.pflb-boards button{font:inherit;font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}' +
+    '.pflb-boards button.on{color:var(--fg);border-color:var(--accent)}' +
     '.pflb-tabs button{font:inherit;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}' +
     '.pflb-tabs button.on{background:var(--accent);border-color:var(--accent);color:#fff}' +
     '.pflb table{width:100%;border-collapse:collapse}.pflb td,.pflb th{padding:9px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}' +
@@ -94,6 +102,17 @@ const WIDGET = String.raw`(function () {
     if (!periods) periods = data.periods || ['all'];
     period = data.period;
     var title = d.title || data.board.label;
+    side = data.board.side;
+    var groups = data.sides || [];
+    // Segregate: one side at a time, never two sides in one list.
+    var sideBar = groups.length > 1 ? '<div class="pflb-sides">' + groups.map(function (g) {
+      return '<button type="button" data-side="' + esc(g.side) + '" class="' + (g.side === side ? 'on' : '') + '">' + esc(g.label) + '</button>';
+    }).join('') + '</div>' : '';
+    var mine = (groups.filter(function (g) { return g.side === side; })[0] || {}).boards || [];
+    var boardBar = mine.length > 1 ? '<div class="pflb-boards">' + mine.map(function (b) {
+      return '<button type="button" data-b="' + esc(b.id) + '" class="' + (b.id === board ? 'on' : '') + '">' + esc(b.label) + '</button>';
+    }).join('') + '</div>' : '';
+    var actor = data.board.actor ? '<span class="pflb-actor">' + esc(data.board.actor) + '</span>' : '';
     var tabs = periods.map(function (p) { return '<button type="button" data-p="' + esc(p) + '" class="' + (p === period ? 'on' : '') + '">' + esc(label(p)) + '</button>'; }).join('');
     var body = rows.length ? rows.map(function (r) {
       var isMe = me && r.id === me;
@@ -112,13 +131,21 @@ const WIDGET = String.raw`(function () {
       var m = data.me;
       meRow = '<tr class="me"><td class="rank">' + (m.rank ? (m.rank < 10 ? '0' : '') + m.rank : '–') + '</td><td class="name">' + esc(m.name) + ' <span style="color:var(--muted);font-weight:400">(you)</span></td><td class="val">' + esc(m.display) + '</td><td class="streak">' + (m.streak ? '🔥' + m.streak : '') + '</td></tr>';
     }
-    root.innerHTML =
-      '<div class="pflb-head"><h3 class="pflb-title">' + esc(title) + '</h3><div class="pflb-tabs">' + tabs + '</div>' + (root.classList.contains('pflb-panel') ? '<button class="pflb-close" aria-label="Close">×</button>' : '') + '</div>' +
+    root.innerHTML = sideBar +
+      '<div class="pflb-head"><h3 class="pflb-title">' + esc(title) + actor + '</h3><div class="pflb-tabs">' + tabs + '</div>' + (root.classList.contains('pflb-panel') ? '<button class="pflb-close" aria-label="Close">×</button>' : '') + '</div>' + boardBar +
       (rows.length || meRow
-        ? '<table><thead><tr><th>#</th><th>Name</th><th style="text-align:right">' + esc(data.board.unit || data.board.label) + '</th><th></th></tr></thead><tbody>' + body + meRow + '</tbody></table>'
+        ? '<table><thead><tr><th>#</th><th>' + esc(data.board.actor || 'Name') + '</th><th style="text-align:right">' + esc(data.board.unit || data.board.label) + '</th><th></th></tr></thead><tbody>' + body + meRow + '</tbody></table>'
         : '<div class="pflb-empty">Nobody on the board yet. Be first.</div>') +
       '<div class="pflb-foot"><span>' + esc(label(period)) + ' · ' + esc(String(data.total || rows.length)) + ' ranked</span><span><a href="' + esc(url('xml')) + '">RSS</a> · <a href="' + esc(origin + base + '?board=' + encodeURIComponent(board) + '&period=' + encodeURIComponent(period)) + '">Full board</a></span></div>';
     root.querySelectorAll('.pflb-tabs button').forEach(function (b) { b.addEventListener('click', function () { period = b.dataset.p; load(root); }); });
+    root.querySelectorAll('.pflb-sides button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var g = groups.filter(function (x) { return x.side === b.dataset.side; })[0];
+        if (!g || !g.boards.length) return;
+        board = g.boards[0].id; side = g.side; load(root);
+      });
+    });
+    root.querySelectorAll('.pflb-boards button').forEach(function (b) { b.addEventListener('click', function () { board = b.dataset.b; load(root); }); });
     root.querySelectorAll('.share').forEach(function (s) { s.addEventListener('click', function (e) { e.preventDefault(); copy(s.dataset.share, s); }); });
     var close = root.querySelector('.pflb-close');
     if (close) close.addEventListener('click', function () { root.hidden = true; });

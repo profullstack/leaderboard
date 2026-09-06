@@ -1,8 +1,8 @@
 {
   "name": "@profullstack/leaderboard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "A public leaderboard with badges, streaks and a commission ladder that drops into any site: score events in, ranked boards + RSS + a share card + an embeddable widget out. Zero dependencies, Fetch API core, Hono and Next adapters.",
+  "description": "A public leaderboard with badges, streaks and a commission ladder that drops into any site. Ranks either side of a transaction, earners and spenders and usage, kept segregated. Zero dependencies, Fetch API core, Hono and Next adapters.",
   "keywords": [
     "leaderboard",
     "gamification",
@@ -17,25 +17,61 @@
     "hono",
     "nextjs",
     "libsql",
-    "turso"
+    "turso",
+    "marketplace",
+    "x402",
+    "crawler"
   ],
-  "repository": { "type": "git", "url": "git+https://github.com/profullstack/leaderboard.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/profullstack/leaderboard.git"
+  },
   "homepage": "https://github.com/profullstack/leaderboard#readme",
-  "bugs": { "url": "https://github.com/profullstack/leaderboard/issues" },
+  "bugs": {
+    "url": "https://github.com/profullstack/leaderboard/issues"
+  },
   "license": "MIT",
   "author": "Profullstack, LLC",
   "exports": {
-    ".": { "types": "./index.d.ts", "import": "./src/index.js" },
-    "./hono": { "types": "./index.d.ts", "import": "./src/hono.js" },
-    "./next": { "types": "./index.d.ts", "import": "./src/next.js" },
-    "./ladder": { "types": "./index.d.ts", "import": "./src/ladder.js" },
-    "./badges": { "types": "./index.d.ts", "import": "./src/badges.js" },
-    "./store/memory": { "types": "./index.d.ts", "import": "./src/store/memory.js" },
-    "./store/sql": { "types": "./index.d.ts", "import": "./src/store/sql.js" }
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./hono": {
+      "types": "./index.d.ts",
+      "import": "./src/hono.js"
+    },
+    "./next": {
+      "types": "./index.d.ts",
+      "import": "./src/next.js"
+    },
+    "./ladder": {
+      "types": "./index.d.ts",
+      "import": "./src/ladder.js"
+    },
+    "./badges": {
+      "types": "./index.d.ts",
+      "import": "./src/badges.js"
+    },
+    "./store/memory": {
+      "types": "./index.d.ts",
+      "import": "./src/store/memory.js"
+    },
+    "./store/sql": {
+      "types": "./index.d.ts",
+      "import": "./src/store/sql.js"
+    }
   },
   "types": "./index.d.ts",
-  "files": ["src", "index.d.ts", "README.md", "LICENSE"],
-  "engines": { "node": ">=20.11" },
+  "files": [
+    "src",
+    "index.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.11"
+  },
   "sideEffects": false,
   "scripts": {
     "test": "node --test"

@@ -1,6 +1,6 @@
 {
   "name": "@profullstack/leaderboard",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "A public leaderboard with badges, streaks and a commission ladder that drops into any site. Ranks either side of a transaction, earners and spenders and usage, kept segregated. Zero dependencies, Fetch API core, Hono and Next adapters.",
   "keywords": [

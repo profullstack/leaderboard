@@ -182,6 +182,16 @@ export const { GET } = leaderboardRoute(lb);
 export const dynamic = 'force-dynamic';
 ```
 
+That serves everything **under** the base path. It does not serve `/leaderboard.json`, because Next matches on path segments and that path is a sibling of `/leaderboard` rather than a child, so the catch-all never sees it. Either use `/leaderboard/index.json`, which is the same index, or give it a route of its own:
+
+```js
+// app/leaderboard.json/route.js
+export const { GET } = leaderboardRoute(lb);
+export const dynamic = 'force-dynamic';
+```
+
+Testing this needs the router, not just the handler: calling the exported `GET` directly answers every path you hand it, including the ones Next would never route to it.
+
 ## Programmatic
 
 ```js

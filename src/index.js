@@ -7,6 +7,7 @@ export { commissionLadder } from './ladder.js';
 export { defaultBadges } from './badges.js';
 export { memoryStore } from './store/memory.js';
 export { sqlStore } from './store/sql.js';
+export { projectionStore } from './store/projection.js';
 
 const DAY = 86_400_000;
 const PERIODS = { all: 0, day: DAY, week: 7 * DAY, month: 30 * DAY };

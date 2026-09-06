@@ -26,6 +26,16 @@ export interface SqlStoreOptions {
 export interface SqlStore extends Store { schema: string[]; tables: { events: string; gauges: string; badges: string }; migrate(): Promise<void> }
 export function sqlStore(options: SqlStoreOptions): SqlStore;
 
+export interface ProjectionOptions {
+  /** Build events from rows you already have. `since` is 0 for all time. */
+  events(opts: { since: number }): Promise<Event[]> | Event[];
+  gauges?(): Promise<Record<string, { name?: string; at: number; values: Record<string, number> }>> | Record<string, { name?: string; at: number; values: Record<string, number> }>;
+  /** Where awarded badges persist. Defaults to memory, which does not survive a restart. */
+  badges?: Pick<Store, 'awardBadge' | 'badges'>;
+}
+/** A read-only store over existing tables. `record()` and `set()` throw. */
+export function projectionStore(options: ProjectionOptions): Store;
+
 export interface LadderOptions {
   base?: number; cap?: number; perProperty?: number; perNiche?: number; maxProperties?: number; maxNiches?: number;
   propertiesMetric?: string; nichesMetric?: string;

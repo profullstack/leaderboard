@@ -142,11 +142,32 @@ Every number is an option (`base`, `cap`, `perProperty`, `perNiche`, `maxPropert
 ## Stores
 
 ```js
-import { memoryStore, sqlStore } from '@profullstack/leaderboard';
+import { memoryStore, sqlStore, projectionStore } from '@profullstack/leaderboard';
 
-memoryStore();                                        // one process, tests
+memoryStore();                                           // one process, tests
 sqlStore({ execute, prefix: 'lb_', dialect: 'sqlite' })  // or 'postgres'
+projectionStore({ events, gauges, badges })              // rank tables you already have
 ```
+
+### Ranking data you already record
+
+Most sites that want a leaderboard are already recording the facts it would rank. Copying those into a second set of tables is a dual write, and a dual write means the board and the ledger disagree the first time one of them fails. `projectionStore` reads the source instead:
+
+```js
+const store = projectionStore({
+  events: async ({ since }) => {
+    const rows = await sql`select payer, total_cents, created_at from crawl_sales
+                           where created_at >= ${new Date(since)}`;
+    return rows.map((r) => ({
+      player: r.payer, name: r.payer, metric: 'spent',
+      delta: r.total_cents, at: +new Date(r.created_at),
+    }));
+  },
+  badges: sqlStore({ execute }),   // badges are awarded, not derived, so they need a home
+});
+```
+
+`since` is `0` for an all-time board, so the query has to handle "everything". The store is read-only: `record()` and `set()` throw rather than drop a write the next projection would overwrite.
 
 `sqlStore` needs `execute({ sql, args }) -> { rows }`, which is `@libsql/client` as is. `store.schema` is the DDL for your own migration tool; `store.migrate()` runs it. Three tables: events, gauges, badges.
 

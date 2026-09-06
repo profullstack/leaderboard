@@ -83,17 +83,21 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      # A brand-new scoped package 404s on every read path for minutes after a
+      # successful publish, so a short window here fails a release that worked.
+      # Wait longer, and never fail the run on the read alone: `npm publish`
+      # exiting 0 is the authority on whether it published.
       - name: Confirm the registry has it
         if: steps.published.outputs.already == 'false'
+        continue-on-error: true
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          for _ in 1 2 3 4 5; do
+          for _ in $(seq 1 30); do
             if [ "$(npm view "@profullstack/leaderboard@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
               echo "@profullstack/leaderboard@$VERSION is on the registry"
               exit 0
             fi
-            sleep 5
+            sleep 10
           done
-          echo "::error::published, but the registry does not report @profullstack/leaderboard@$VERSION yet"
-          exit 1
+          echo "::warning::published, but the registry does not report @profullstack/leaderboard@$VERSION yet (first publishes can lag several minutes)"
